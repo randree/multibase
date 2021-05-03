@@ -1,0 +1,73 @@
+version: "3.7"
+services:
+  first_write:
+    image: 'bitnami/postgresql:latest'
+    # user: 1001:1001 bitnami/postgresql is always non-root
+    ports:
+      - 9000:5432
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=user_first_read
+      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
+      - POSTGRESQL_USERNAME=first_write
+      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_DATABASE=testdb
+      # Only the superuser "postgres" can execute "CREATE EXTENSION IF NOT EXISTS "pgcrypto";" if needed for UUID
+      # Superuser needs a password set here
+      - POSTGRESQL_POSTGRES_PASSWORD=postgres
+      # To see direct actions on the database while examining read and write behavior:
+      - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
+      - POSTGRESQL_SYNCHRONOUS_COMMIT_MODE=remote_apply # Safest method for data consistency
+    networks:
+      - net
+
+
+  first_read_1:
+    image: 'bitnami/postgresql:latest'
+    ports:
+      - 9001:5432
+    depends_on:
+      - first_write
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=user_first_read
+      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
+      - POSTGRESQL_MASTER_HOST=mycomputer
+      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_MASTER_PORT_NUMBER=9000
+      - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
+    networks:
+      - net
+
+
+  first_read_2:
+    image: 'bitnami/postgresql:latest'
+    ports:
+      - 9002:5432
+    depends_on:
+      - first_write
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=user_first_read
+      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
+      - POSTGRESQL_MASTER_HOST=mycomputer
+      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_MASTER_PORT_NUMBER=9000
+      - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
+    networks:
+      - net
+
+  # second_write is a normal database without replication
+  second_write:
+    image: postgres:13.1-alpine
+    ports:
+      - 9003:5432
+    networks:
+      - net
+    environment:
+      - POSTGRES_DB=second_write
+      - POSTGRES_USER=user_second_write
+      - POSTGRES_PASSWORD=second_writepw
+
+networks:
+  net:
