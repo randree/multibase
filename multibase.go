@@ -23,43 +23,12 @@ import (
 
 	// c "app/database/structure"
 
-	"app/database/config"
-	"app/database/logger"
+	"github.com/randree/multibase/config"
+	"github.com/randree/multibase/logger"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-// type database struct {
-// 	write             []*node
-// 	read              []*node
-// 	readTickerActive  bool
-// 	readCheckerActive bool
-// 	gateway           *gorm.DB
-// }
-
-// func (dbs *database) AppendWrite(dbWrite *node) {
-// 	dbs.write = append(dbs.write, dbWrite)
-// }
-
-// func (dbs *database) AppendRead(dbRead *node) {
-// 	dbs.read = append(dbs.read, dbRead)
-// }
-
-// If an error occures
-// 1. Ping connection
-// If Ping is not successful change online to false
-// Then the connpool is not used for db requests
-// type node struct {
-// 	name        string
-// 	db          *gorm.DB
-// 	sql         *sql.DB
-// 	connpool    gorm.ConnPool
-// 	queryCount  int64
-// 	online      bool
-// 	pingTries   int
-// 	errorsCount int
-// }
 
 var (
 	DB Database
