@@ -58,10 +58,10 @@ func NewDatabaseConfig() config.DatabaseConf {
 	replica.AppendReadNodeConf(nodeRead1)
 	replica.AppendReadNodeConf(nodeRead2)
 
-	database := config.NewDatabaseConf()
-	database.AppendReplicationConf("first_db", replica)
+	databaseSetConf := config.NewDatabaseConf()
+	databaseSetConf.AppendReplicationConf("first_db", replica)
 
-	return database
+	return databaseSetConf
 }
 ```
 The database access is called `first_db`. Appending databases is done by `AppendReplicationConf("...", replica)`
@@ -69,13 +69,13 @@ The database access is called `first_db`. Appending databases is done by `Append
 ## 2. Initialize databases
 
 ```golang
-dbConfig := NewDatabaseConfig()
+databaseSetConf := NewDatabaseConfig()
 
 //Shows all 4 seconds a status of all databases
 debugmode := false
 
 // Call InitDb to initialize databases, e.q. in your main
-InitDb(dbConfig, debugmode)
+InitDb(databaseSetConf, debugmode)
 ```
 
 ## 3. Get instance of database
