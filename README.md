@@ -120,11 +120,11 @@ Even under heavy concurrent load, the rerouting was (almost) seamless.
 
 # ToDos
 
-* Adding multiple write nodes. At this time only one write node does the work
-* If a connection on a read node is interrupted there is a loss of about one query depending on the concurrency. This can be fixed by catching these queries
-* Add new nodes on the fly
-* Optimizing the administration
-* More testing 
+* Adding multiple write nodes. At this time only one write node does the work.
+* If a connection on a read node is interrupted there is a loss of about one query depending on the concurrency. This can be fixed by catching these queries.
+* Adding new nodes on the fly.
+* Optimizing the administration.
+* More testing.
 
 
 
