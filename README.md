@@ -12,7 +12,7 @@ Under the hood this package uses [GROM hooks](https://gorm.io/docs/hooks.html). 
 
 Lets start with one write and two read nodes.
 
-```
+```golang
 func NewDatabaseConfig() config.DatabaseConf {
 	// WRITE NODE
 	nodeWrite := &config.NodeConf{
@@ -68,7 +68,7 @@ The database access is called `first_db`. Appending databases is done by `Append
 
 ## 2. Initialize databases
 
-```
+```golang
 dbConfig := NewDatabaseConfig()
 
 //Shows all 4 seconds a status of all databases
@@ -80,7 +80,7 @@ InitDb(dbConfig, debugmode)
 
 ## 3. Get instance of database
 
-```
+```golang
 db, err := Use("first_db")
 if err != nil {
     ...
@@ -102,7 +102,7 @@ db.Create(&users) //write
 
 # Status of nodes
 The status of a node can be verified by 
-```
+```golang
 node := UseNode("mydatabase", "host", 9000)
 ```
 
