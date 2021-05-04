@@ -1,4 +1,4 @@
-package database
+package multibase
 
 type Database map[string]*Replication
 

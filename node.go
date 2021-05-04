@@ -1,4 +1,4 @@
-package database
+package multibase
 
 import (
 	"database/sql"
@@ -8,6 +8,8 @@ import (
 
 type Node struct {
 	name        string
+	host        string
+	port        int
 	db          *gorm.DB
 	sql         *sql.DB
 	connpool    gorm.ConnPool

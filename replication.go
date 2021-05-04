@@ -1,4 +1,4 @@
-package database
+package multibase
 
 import "gorm.io/gorm"
 

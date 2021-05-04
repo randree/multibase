@@ -7,12 +7,12 @@ services:
       - 9000:5432
     environment:
       - POSTGRESQL_REPLICATION_MODE=master
-      - POSTGRESQL_REPLICATION_USER=user_first_read
-      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
-      - POSTGRESQL_USERNAME=first_write
-      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_REPLICATION_USER=replication_user
+      - POSTGRESQL_REPLICATION_PASSWORD=replication_password
+      - POSTGRESQL_USERNAME=database_user
+      - POSTGRESQL_PASSWORD=database_password
       - POSTGRESQL_DATABASE=testdb
-      # Only the superuser "postgres" can execute "CREATE EXTENSION IF NOT EXISTS "pgcrypto";" if needed for UUID
+      # Only the superuser "postgres" can execute "CREATE EXTENSION IF NOT EXISTS "pgcrypto";" if needed for having UUIDs
       # Superuser needs a password set here
       - POSTGRESQL_POSTGRES_PASSWORD=postgres
       # To see direct actions on the database while examining read and write behavior:
@@ -30,10 +30,10 @@ services:
       - first_write
     environment:
       - POSTGRESQL_REPLICATION_MODE=slave
-      - POSTGRESQL_REPLICATION_USER=user_first_read
-      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
+      - POSTGRESQL_REPLICATION_USER=replication_user
+      - POSTGRESQL_REPLICATION_PASSWORD=replication_password
       - POSTGRESQL_MASTER_HOST=mycomputer
-      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_PASSWORD=database_password
       - POSTGRESQL_MASTER_PORT_NUMBER=9000
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
     networks:
@@ -48,10 +48,10 @@ services:
       - first_write
     environment:
       - POSTGRESQL_REPLICATION_MODE=slave
-      - POSTGRESQL_REPLICATION_USER=user_first_read
-      - POSTGRESQL_REPLICATION_PASSWORD=first_readpw
+      - POSTGRESQL_REPLICATION_USER=replication_user
+      - POSTGRESQL_REPLICATION_PASSWORD=replication_password
       - POSTGRESQL_MASTER_HOST=mycomputer
-      - POSTGRESQL_PASSWORD=first_writepw
+      - POSTGRESQL_PASSWORD=database_password
       - POSTGRESQL_MASTER_PORT_NUMBER=9000
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
     networks:

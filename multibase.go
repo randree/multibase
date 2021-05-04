@@ -1,17 +1,18 @@
-package database
+package multibase
 
 // This is a multi database replication connector
-// You can have multible data sources and for each source there is a write/read configuration
+// You can have multiple data sources and for each source there is a write/read configuration
 // If a read database connection is lost other "reads" or the write take over
 // When the connection is "repaired" it will reconnect
 // I tried the following configuration W/R/R with 800 concurrent read requests.
 // Then I switched off the first R and the second R so that the W took the full load.
-// Execpt 40 errors there was no interruption. While on the request side we had 290618.
+// Except 40 errors there was no interruption. While on the request side we had 290618.
 // That is a ratio of 0.014%!
 
-// ToDo: Multible write nodes. At this time only one write node is used
+// ToDo: Multiple write nodes. At this time only one write node is used
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -39,7 +40,7 @@ func isTransaction(connPool gorm.ConnPool) bool {
 	return ok
 }
 
-// InitDb initalizes data bases
+// InitDb initializes data bases
 func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 
 	// Initializing sources
@@ -52,7 +53,7 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 		// WRITE
 
 		if len(databaseConf.Write) == 0 {
-			log.Panic("DATABASE | No WRITE defined on " + databaseName)
+			log.Panic("MULTIBASE | No WRITE defined on " + databaseName)
 		}
 
 		for _, replicationConf := range databaseConf.Write {
@@ -61,15 +62,17 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 
 			// No master node should be down, panic
 			if err != nil || sqlErr != nil {
-				log.Error("DATABASE | WRITE Connection error on " + databaseName + " (" + replicationConf.Host + ":" + strconv.Itoa(replicationConf.Port) + ")")
+				log.Error("MULTIBASE | WRITE Connection error on " + databaseName + " (" + replicationConf.Host + ":" + strconv.Itoa(replicationConf.Port) + ")")
 				log.Panic(err)
 			}
 			node := &Node{
 				name:        fmt.Sprintf("%s:%d", replicationConf.Host, replicationConf.Port),
+				host:        replicationConf.Host,
+				port:        replicationConf.Port,
 				db:          db,
 				sql:         sql,
 				connpool:    db.Statement.ConnPool,
-				online:      true,
+				online:      SetStatus(err),
 				pingTries:   0,
 				errorsCount: 0,
 			}
@@ -77,7 +80,7 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 			// writer = append(writer, dbDatabaseObj)
 			replication.AppendWriteNode(node)
 
-			log.Info("DATABASE | Connected WRITE " + databaseName + " (" + node.name + ")")
+			log.Info("MULTIBASE | Connected WRITE " + databaseName + " (" + node.name + ")")
 		}
 
 		// READ
@@ -87,25 +90,27 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 
 			// No panic if connection fails, but set offline
 			if err != nil || sqlErr != nil {
-				log.Error("DATABASE | READ Connection error on " + databaseName + " (" + replicationConf.Host + ":" + strconv.Itoa(replicationConf.Port) + ")")
+				log.Error("MULTIBASE | READ Connection error on " + databaseName + " (" + replicationConf.Host + ":" + strconv.Itoa(replicationConf.Port) + ")")
 				log.Error(err)
 			}
 			node := &Node{
 				name:        fmt.Sprintf("%s:%d", replicationConf.Host, replicationConf.Port),
+				host:        replicationConf.Host,
+				port:        replicationConf.Port,
 				db:          db,
 				sql:         sql,
 				connpool:    db.Statement.ConnPool,
-				online:      RandBool(),
+				online:      SetStatus(err),
 				pingTries:   0,
 				errorsCount: 0,
 			}
 
 			replication.AppendReadNode(node)
 
-			log.Info("DATABASE | Connected READ " + databaseName + " (" + node.name + ")")
+			log.Info("MULTIBASE | Connected READ " + databaseName + " (" + node.name + ")")
 			if db == nil {
 				node.errorsCount++
-				log.Error("DATABASE | ERROR READ " + databaseName + " (" + node.name + ")")
+				log.Error("MULTIBASE | ERROR READ " + databaseName + " (" + node.name + ")")
 			}
 		}
 
@@ -115,7 +120,7 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 		// Choose first master as gateway
 		replication.gateway = replication.Write[0].db
 
-		// Create a singelton for timer to prevent concurency multible checkings
+		// Create a singleton for timer to prevent concurrency multiple checkings
 		replication.readTickerActive = true
 		// same for checking if a connection is still offline
 		replication.readCheckerActive = true
@@ -137,16 +142,23 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 			})
 
 			replication.gateway.Callback().Query().After("*").Register("errorhandler", func(db *gorm.DB) {
-				// If an error occures it could mean the loss of the connection
-				// So we ping all connectinos to make sure there is no error
+				// If an error occurs it could mean the loss of the connection
+				// So we ping all connections to make sure there is no error
 				// If a ping fails the connection will be marked as offline
 				if db.Error != nil {
-					log.Error("DATABASE | error occured ", db.Error)
+					log.Error("MULTIBASE | error occurred ", db.Error)
 					pingAllReadSetOfflineOnConnError(replication.Read)
 					tickerToReconnect(&replication.readTickerActive, replication.Read)
 				}
 			})
 
+		} else {
+			// If no READ is set
+			replication.gateway.Callback().Query().Before("*").Register("distributor", func(db *gorm.DB) {
+				if !isTransaction(db.Statement.ConnPool) {
+					replication.Write[0].queryCount++
+				}
+			})
 		}
 
 	}
@@ -163,7 +175,7 @@ func tickerToReconnect(active *bool, db []*Node) {
 		*active = false
 		go func() {
 			for range time.Tick(4 * time.Second) {
-				// logStatus()
+				// Status()
 				allOnline := true
 				for _, replication := range db {
 					if !replication.online {
@@ -173,7 +185,7 @@ func tickerToReconnect(active *bool, db []*Node) {
 							replication.online = false
 							allOnline = false
 						} else {
-							log.Warn("DATABASE | is reconnected and online now: " + replication.name)
+							log.Warn("MULTIBASE | is reconnected and online now: " + replication.name)
 							replication.online = true
 						}
 					}
@@ -189,13 +201,13 @@ func tickerToReconnect(active *bool, db []*Node) {
 }
 
 func pingAllReadSetOfflineOnConnError(db []*Node) {
-	// If an error occures ping all read databases if they are still alive
+	// If an error occurs ping all read databases if they are still alive
 	for _, replication := range db {
 		if replication.online {
 			sql, _ := replication.db.DB()
 			if err := sql.Ping(); err != nil {
 				replication.errorsCount++
-				log.Error("DATABASE | ping failed, swich to offline: " + replication.name)
+				log.Error("MULTIBASE | ping failed, switch to offline: " + replication.name)
 				replication.online = false
 			}
 		}
@@ -205,26 +217,27 @@ func pingAllReadSetOfflineOnConnError(db []*Node) {
 func logTicker() {
 	go func() {
 		for range time.Tick(4 * time.Second) {
-			logStatus()
+			fmt.Println(Status())
 		}
 	}()
 }
 
-func logStatus() {
+func Status() string {
+	output := ""
 	for databaseName, sourceData := range DB {
 		for _, writeData := range sourceData.Write {
-			fmt.Println("DATABASE | STATUS ", databaseName, " \t WRITE \t database ", writeData.name, " : \t ", writeData.online, " \tqueries: ", writeData.queryCount, " \terrors: ", writeData.errorsCount)
+			output += fmt.Sprintln("MULTIBASE | STATUS ", databaseName, " \t WRITE \t database ", writeData.name, " : \t ", writeData.online, " \treads: ", writeData.queryCount, " \terrors: ", writeData.errorsCount)
 		}
 		for _, readData := range sourceData.Read {
-			fmt.Println("DATABASE | STATUS ", databaseName, " \t READ \t database ", readData.name, " : \t ", readData.online, " \tqueries: ", readData.queryCount, " \terrors: ", readData.errorsCount)
+			output += fmt.Sprintln("MULTIBASE | STATUS ", databaseName, " \t READ \t database ", readData.name, " : \t ", readData.online, " \treads: ", readData.queryCount, " \terrors: ", readData.errorsCount)
 		}
 	}
-	fmt.Println()
+	return output
 }
 
-func RandBool() bool {
-	// rand.Seed(1)
-	return true
+// If no error then status is online (true)
+func SetStatus(err error) bool {
+	return err == nil
 }
 
 // No need to build a round robin because of concurrency
@@ -247,27 +260,46 @@ func getNextDbDatabase(db []*Node) *Node {
 	return tempDb[randomIndex]
 }
 
-func Use(databaseName string) *gorm.DB {
+func Use(databaseName string) (*gorm.DB, error) {
 	// Get db from the Database list
 	db := DB.GetReplicationset(databaseName)
 	if db == nil {
-		log.Error("DATABASE | no datasource \"" + databaseName + "\" known")
-		return nil
+		return nil, errors.New("MULTIBASE | no database \"" + databaseName + "\" known")
 	}
 
 	// No gateway found
 	if db.gateway == nil {
-		log.Error("DATABASE | no gateway found at \"" + databaseName + "\"")
-		return nil
+		return nil, errors.New("MULTIBASE | no gateway found at \"" + databaseName + "\"")
 	}
 
-	return db.gateway
+	return db.gateway, nil
+}
+
+func UseNode(databaseName string, host string, port int) *Node {
+	db := DB.GetReplicationset(databaseName)
+	if db == nil {
+		log.Error("MULTIBASE | no database \"" + databaseName + "\" known")
+		return nil
+	}
+	for _, write := range db.Write {
+		if write.host == host && write.port == port {
+			return write
+		}
+	}
+
+	for _, read := range db.Read {
+		if read.host == host && read.port == port {
+			return read
+		}
+	}
+	log.Error("MULTIBASE | no node found at ", host, ":", port)
+	return nil
 }
 
 func openDB(nodeConf *config.NodeConf) (*gorm.DB, error) {
 
 	config := logger.LoggerConfig{
-		SlowThreshold:         200 * time.Millisecond,
+		SlowThreshold:         1000 * time.Millisecond,
 		SkipErrRecordNotFound: false,
 		LogQuery:              nodeConf.LogQuery,
 	}
