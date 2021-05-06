@@ -24,7 +24,7 @@ import (
 
 	// c "app/database/structure"
 
-	"multibase/config"
+	"github.com/randree/multibase/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

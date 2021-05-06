@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"multibase/config"
 	logrusLogger "multibase/logger"
+
+	"github.com/randree/multibase/config"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
