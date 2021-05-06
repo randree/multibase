@@ -22,10 +22,6 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
-	// c "app/database/structure"
-
-	"github.com/randree/multibase/config"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -40,7 +36,7 @@ func isTransaction(connPool gorm.ConnPool) bool {
 }
 
 // InitDb initializes data bases
-func InitDb(databaseConfs config.DatabaseConf, debug bool) {
+func InitDb(databaseConfs DatabaseConf, debug bool) {
 
 	// Initializing sources
 	DB = NewDatabase()
@@ -297,7 +293,7 @@ func UseNode(databaseName string, host string, port int) *Node {
 	return nil
 }
 
-func openNode(nodeConf *config.NodeConf) (*gorm.DB, error) {
+func openNode(nodeConf *NodeConf) (*gorm.DB, error) {
 
 	psqlDSN := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=%s",

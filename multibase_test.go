@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	logrusLogger "multibase/logger"
-
-	"github.com/randree/multibase/config"
+	logrusLogger "github.com/randree/multibase/logger"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -29,11 +27,11 @@ func NewLogger() logger.Interface {
 	return logrusLogger.New(config)
 }
 
-func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
+func NewDatabaseConfig(logger *logger.Interface) DatabaseConf {
 
 	// First database with one write node and two read nodes
 	// WRITE NODE
-	nodeWrite := &config.NodeConf{
+	nodeWrite := &NodeConf{
 		Host:              "mycomputer",
 		Port:              9000,
 		User:              "database_user",
@@ -47,7 +45,7 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
 	}
 
 	// READ NODE 1
-	nodeRead1 := &config.NodeConf{
+	nodeRead1 := &NodeConf{
 		Host:              "mycomputer",
 		Port:              9001,
 		User:              "database_user", // User must be the master.
@@ -61,7 +59,7 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
 	}
 
 	// READ NODE 2
-	nodeRead2 := &config.NodeConf{
+	nodeRead2 := &NodeConf{
 		Host:              "mycomputer",
 		Port:              9002,
 		User:              "database_user",
@@ -74,17 +72,17 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
 		DbLogger:          *logger,
 	}
 
-	replica := config.NewReplicationConf()
+	replica := NewReplicationConf()
 	replica.AppendWriteNodeConf(nodeWrite)
 	replica.AppendReadNodeConf(nodeRead1)
 	replica.AppendReadNodeConf(nodeRead2)
 
-	database := config.NewDatabaseConf()
+	database := NewDatabaseConf()
 	// Name for connection can be different from the database name, here first_db != testdb
 	database.AppendReplicationConf("first_db", replica)
 
 	// Second database with only one write node
-	nodeCustomerWrite := &config.NodeConf{
+	nodeCustomerWrite := &NodeConf{
 		Host:              "mycomputer",
 		Port:              9003,
 		User:              "user_second_write",
@@ -97,7 +95,7 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
 		DbLogger:          *logger,
 	}
 
-	replicaCustomer := config.NewReplicationConf()
+	replicaCustomer := NewReplicationConf()
 	replicaCustomer.AppendWriteNodeConf(nodeCustomerWrite)
 
 	database.AppendReplicationConf("second_db", replicaCustomer)

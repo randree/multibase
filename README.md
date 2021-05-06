@@ -26,10 +26,10 @@ func NewLogger() logger.Interface {
 	return logrusLogger.New(config)
 }
 
-func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf
+func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
 
 	// WRITE NODE
-	nodeWrite := &config.NodeConf{
+	nodeWrite := &multibase.NodeConf{
 		Host:              "mycomputer",
 		Port:              9000,
 		User:              "database_user",
@@ -43,7 +43,7 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf
 	}
 
 	// READ NODE 1
-	nodeRead1 := &config.NodeConf{
+	nodeRead1 := &multibase.NodeConf{
 		Host:              "mycomputer",
 		Port:              9001,
 		User:              "database_user", // User must be the master.
@@ -57,7 +57,7 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf
 	}
 
 	// READ NODE 2
-	nodeRead2 := &config.NodeConf{
+	nodeRead2 := &multibase.NodeConf{
 		Host:              "mycomputer",
 		Port:              9002,
 		User:              "database_user",
@@ -70,12 +70,12 @@ func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf
 		DbLogger:          *logger,
 	}
 
-	replica := config.NewReplicationConf()
+	replica := multibase.NewReplicationConf()
 	replica.AppendWriteNodeConf(nodeWrite)
 	replica.AppendReadNodeConf(nodeRead1)
 	replica.AppendReadNodeConf(nodeRead2)
 
-	databaseSetConf := config.NewDatabaseConf()
+	databaseSetConf := multibase.NewDatabaseConf()
 	databaseSetConf.AppendReplicationConf("first_db", replica)
 
 	return databaseSetConf
