@@ -1,6 +1,8 @@
 package logger
 
 // Thanks to https://github.com/onrik/gorm-logrus/blob/master/logger.go
+// This is a slightly adapted version of it. It filters password and token columns.
+// This should be improved.
 
 import (
 	"context"
@@ -62,8 +64,6 @@ func (l *logger) Trace(ctx context.Context, begin time.Time, fc func() (string, 
 	sql = m1.ReplaceAllString(sql, "t***")
 	m2 := regexp.MustCompile(`.?password.?=.?\'(.*)\'`)
 	sql = m2.ReplaceAllString(sql, "p***")
-	m3 := regexp.MustCompile(`INSERT INTO "sys_sessions".*`)
-	sql = m3.ReplaceAllString(sql, `INSERT INTO "sys_sessions" ***`)
 
 	if l.SourceField != "" {
 		fields[l.SourceField] = utils.FileWithLineNum()

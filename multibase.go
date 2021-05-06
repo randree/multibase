@@ -24,8 +24,7 @@ import (
 
 	// c "app/database/structure"
 
-	"github.com/randree/multibase/config"
-	"github.com/randree/multibase/logger"
+	"multibase/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -57,7 +56,7 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 		}
 
 		for _, replicationConf := range databaseConf.Write {
-			db, err := openDB(replicationConf)
+			db, err := openNode(replicationConf)
 			sql, sqlErr := db.DB()
 
 			// No master node should be down, panic
@@ -85,7 +84,7 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 
 		// READ
 		for _, replicationConf := range databaseConf.Read {
-			db, err := openDB(replicationConf)
+			db, err := openNode(replicationConf)
 			sql, sqlErr := db.DB()
 
 			// No panic if connection fails, but set offline
@@ -145,10 +144,12 @@ func InitDb(databaseConfs config.DatabaseConf, debug bool) {
 				// If an error occurs it could mean the loss of the connection
 				// So we ping all connections to make sure there is no error
 				// If a ping fails the connection will be marked as offline
-				if db.Error != nil {
-					log.Error("MULTIBASE | error occurred ", db.Error)
-					pingAllReadSetOfflineOnConnError(replication.Read)
-					tickerToReconnect(&replication.readTickerActive, replication.Read)
+				if !isTransaction(db.Statement.ConnPool) {
+					if db.Error != nil {
+						log.Error("MULTIBASE | error occurred ", db.Error)
+						pingAllReadSetOfflineOnConnError(replication.Read)
+						tickerToReconnect(&replication.readTickerActive, replication.Read)
+					}
 				}
 			})
 
@@ -296,15 +297,9 @@ func UseNode(databaseName string, host string, port int) *Node {
 	return nil
 }
 
-func openDB(nodeConf *config.NodeConf) (*gorm.DB, error) {
+func openNode(nodeConf *config.NodeConf) (*gorm.DB, error) {
 
-	config := logger.LoggerConfig{
-		SlowThreshold:         1000 * time.Millisecond,
-		SkipErrRecordNotFound: false,
-		LogQuery:              nodeConf.LogQuery,
-	}
-	newLogger := logger.New(config)
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+	psqlDSN := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=%s",
 		nodeConf.Host,
 		nodeConf.Port,
@@ -314,19 +309,18 @@ func openDB(nodeConf *config.NodeConf) (*gorm.DB, error) {
 		nodeConf.Sslmode)
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN: psqlInfo, // data Database name, refer https://github.com/jackc/pgx
+		DSN: psqlDSN, // data Database name, refer https://github.com/jackc/pgx
 		//PreferSimpleProtocol: true, // disables implicit prepared statement usage. By default pgx automatically uses the extended protocol
 	}), &gorm.Config{
-		Logger: newLogger,
+		Logger: nodeConf.DbLogger,
 	})
 
 	sql, _ := db.DB()
 
-	//http://go-database-sql.org/connection-pool.html
-	sql.SetMaxOpenConns(40)
-	sql.SetMaxIdleConns(8)
-	// sqlDB.SetConnMaxLifetime(0.01)
-	//sqlDB.SetConnMaxLifetime(time.Hour)
+	//For more information http://go-database-sql.org/connection-pool.html
+	sql.SetMaxOpenConns(nodeConf.DbMaxOpenConns)
+	sql.SetMaxIdleConns(nodeConf.DbMaxIdleConns)
+	sql.SetConnMaxLifetime(nodeConf.DbConnMaxLifetime)
 
 	return db, err
 }

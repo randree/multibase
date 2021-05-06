@@ -13,44 +13,61 @@ Under the hood this package uses [GROM hooks](https://gorm.io/docs/hooks.html). 
 Lets start with one write and two read nodes.
 
 ```golang
-func NewDatabaseConfig() config.DatabaseConf {
+
+// You can write your own logger or you can use the GORM logger
+func NewLogger() logger.Interface {
+	
+	config := logrusLogger.LoggerConfig{
+		SlowThreshold:         1000 * time.Millisecond, //show query if it takes to long to process
+		SkipErrRecordNotFound: false,
+		LogQuery:              false, // show all queries in logs
+	}
+
+	return logrusLogger.New(config)
+}
+
+func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf
+
 	// WRITE NODE
 	nodeWrite := &config.NodeConf{
-		Host:                 "mycomputer",
-		Port:                 9000,
-		User:                 "database_user",
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9000,
+		User:              "database_user",
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger, // If needed each node can get its own individual logger
 	}
 
 	// READ NODE 1
 	nodeRead1 := &config.NodeConf{
-		Host:                 "mycomputer",
-		Port:                 9001,
-		User:                 "database_user",
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9001,
+		User:              "database_user", // User must be the master.
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
 	// READ NODE 2
 	nodeRead2 := &config.NodeConf{
-		Host:                 "mycomputer",
-		Port:                 9002,
-		User:                 "database_user",
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9002,
+		User:              "database_user",
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
 	replica := config.NewReplicationConf()
@@ -67,9 +84,12 @@ func NewDatabaseConfig() config.DatabaseConf {
 The database access is called `first_db`. Appending databases is done by `AppendReplicationConf("...", replica)`
 
 ## 2. Initialize databases
+You can choose the [GORM logger]() or a [logrus logger](https://github.com/onrik/gorm-logrus) or write your own one.
 
 ```golang
-databaseSetConf := NewDatabaseConfig()
+logger := NewLogger()
+
+dbConfig := NewDatabaseConfig(&logger)
 
 //Shows all 4 seconds a status of all databases
 debugmode := false
@@ -114,9 +134,24 @@ node := UseNode("mydatabase", "host", 9000)
 
 Turning off a read node on the fly can be done with `node.online = false`. Then it can be safely turned down, replaced and restarted again. When it's ready with `node.online = true` it can be activated.
 
+# Benchmark
+
+After shutting down one read node after another and heavy concurrent load the rerouting was (almost) seamless. When turning them on again the system went back to a equal distribution between read nodes.
+
+A quantitative analysis would be interesting.
+
 # Testing
 
-Even under heavy concurrent load, the rerouting was (almost) seamless. 
+
+For testing this package go to the directory root and execute
+```bash
+$ docker-compose up
+```
+and
+```bash
+$ go test -count=1 -v ./...
+```
+
 
 # ToDos
 

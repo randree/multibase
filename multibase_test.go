@@ -4,56 +4,73 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/randree/multibase/config"
+	"multibase/config"
+	logrusLogger "multibase/logger"
+
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
+
+	"gorm.io/gorm/logger"
 )
 
 var (
-	wg sync.WaitGroup
+	wg1, wg2 sync.WaitGroup
 )
 
-func NewDatabaseConfig() config.DatabaseConf {
+func NewLogger() logger.Interface {
+	config := logrusLogger.LoggerConfig{
+		SlowThreshold:         1000 * time.Millisecond, //show query if it takes to long to process
+		SkipErrRecordNotFound: false,
+		LogQuery:              false, // show all queries in logs
+	}
+	return logrusLogger.New(config)
+}
+
+func NewDatabaseConfig(logger *logger.Interface) config.DatabaseConf {
 
 	// First database with one write node and two read nodes
+	// WRITE NODE
 	nodeWrite := &config.NodeConf{
-		// WRITE NODE
-		Host:                 "mycomputer",
-		Port:                 9000,
-		User:                 "database_user",
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9000,
+		User:              "database_user",
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
+	// READ NODE 1
 	nodeRead1 := &config.NodeConf{
-		// READ NODE 1
-		Host:                 "mycomputer",
-		Port:                 9001,
-		User:                 "database_user", // User must be the master.
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9001,
+		User:              "database_user", // User must be the master.
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
+	// READ NODE 2
 	nodeRead2 := &config.NodeConf{
-		// READ NODE 2
-		Host:                 "mycomputer",
-		Port:                 9002,
-		User:                 "database_user",
-		Password:             "database_password",
-		Sslmode:              "disable",
-		Db:                   "testdb",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9002,
+		User:              "database_user",
+		Password:          "database_password",
+		Sslmode:           "disable",
+		Db:                "testdb",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
 	replica := config.NewReplicationConf()
@@ -67,15 +84,16 @@ func NewDatabaseConfig() config.DatabaseConf {
 
 	// Second database with only one write node
 	nodeCustomerWrite := &config.NodeConf{
-		Host:                 "mycomputer",
-		Port:                 9003,
-		User:                 "user_second_write",
-		Password:             "second_writepw",
-		Sslmode:              "disable",
-		Db:                   "second_write",
-		DbMaxConnections:     40,
-		DbMaxOpenConnections: 8,
-		LogQuery:             false,
+		Host:              "mycomputer",
+		Port:              9003,
+		User:              "user_second_write",
+		Password:          "second_writepw",
+		Sslmode:           "disable",
+		Db:                "second_write",
+		DbMaxOpenConns:    40,
+		DbMaxIdleConns:    8,
+		DbConnMaxLifetime: 1 * time.Hour,
+		DbLogger:          *logger,
 	}
 
 	replicaCustomer := config.NewReplicationConf()
@@ -100,8 +118,10 @@ type Secondtable struct {
 func Test_multibase(t *testing.T) {
 
 	// logrus.SetOutput(ioutil.Discard)
+	// You can choose a logger for all nodes or you can write your own NewDatabaseConfig with individual loggers
+	logger := NewLogger()
 
-	dbConfig := NewDatabaseConfig()
+	dbConfig := NewDatabaseConfig(&logger)
 
 	//With debug mode all 4 seconds a status of all databases is shown
 	debugmode := false
@@ -170,18 +190,20 @@ func Test_multibase(t *testing.T) {
 	test1 := &Firsttable{}
 	test2 := &Secondtable{}
 
-	wg.Add(200)
+	wg1.Add(100)
+	wg2.Add(100)
 	for i := 0; i < 100; i++ {
 		go func() {
 			firstdb.Take(test1)
-			wg.Done()
+			wg1.Done()
 		}()
 		go func() {
 			seconddb.Take(test2)
-			wg.Done()
+			wg2.Done()
 		}()
 	}
-	wg.Wait()
+	wg1.Wait()
+	wg2.Wait()
 
 	fmt.Println("READ TEST 2")
 	fmt.Println(Status())
@@ -211,18 +233,20 @@ func Test_multibase(t *testing.T) {
 	// The second read node takes over
 	sql, _ := firstReadNode1.db.DB()
 	sql.Close()
-	wg.Add(200)
+	wg1.Add(100)
+	wg2.Add(100)
 	for i := 0; i < 100; i++ {
 		go func() {
 			firstdb.Take(test1)
-			wg.Done()
+			wg1.Done()
 		}()
 		go func() {
 			seconddb.Take(test2)
-			wg.Done()
+			wg2.Done()
 		}()
 	}
-	wg.Wait()
+	wg1.Wait()
+	wg2.Wait()
 
 	fmt.Println("READ TEST 3")
 	fmt.Println(Status())
@@ -239,18 +263,20 @@ func Test_multibase(t *testing.T) {
 	sql, _ = firstReadNode2.db.DB()
 	sql.Close()
 
-	wg.Add(200)
+	wg1.Add(100)
+	wg2.Add(100)
 	for i := 0; i < 100; i++ {
 		go func() {
 			firstdb.Take(test1)
-			wg.Done()
+			wg1.Done()
 		}()
 		go func() {
 			seconddb.Take(test2)
-			wg.Done()
+			wg2.Done()
 		}()
 	}
-	wg.Wait()
+	wg1.Wait()
+	wg2.Wait()
 
 	fmt.Println(Status())
 	t.Run("Verify all goes over master", func(t *testing.T) {
