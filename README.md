@@ -1,6 +1,6 @@
 # Postgres high-availability multiple databases connector for GROM
 
-Simple package to access multiple Postgres database clusters. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and not part of this package. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
+Simple module to access multiple Postgres database clusters. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and not part of this module. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
 
 If an error occurs while process a read query the connector marks the node as offline and tries to ping until success. During offline time all queries are handled by the remaining read nodes. If all read nodes are offline the the load will be redirected to the master.
 
@@ -81,7 +81,7 @@ func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
 	return databaseSetConf
 }
 ```
-The database access is called `first_db`. Appending databases is done by `AppendReplicationConf("...", replica)`
+Database access is called `first_db`. Appending databases is done by `AppendReplicationConf("...", replica)`
 
 ## 2. Initialize databases
 You can choose the [GORM logger]() or a [logrus logger](https://github.com/onrik/gorm-logrus) or write your own one.
@@ -136,14 +136,14 @@ Turning off a read node on the fly can be done with `node.online = false`. Then 
 
 # Benchmark
 
-After shutting down one read node after another and heavy concurrent load the rerouting was (almost) seamless. When turning them on again the system went back to a equal distribution between read nodes.
+After shutting down one read node after another under heavy concurrent load the rerouting was (almost) seamless. When turning them on again the system went back to a equal distribution between read nodes without any interruptions.
 
 A quantitative analysis would be interesting.
 
 # Testing
 
 
-For testing this package go to the directory root and execute
+For testing this module go to directory root and execute
 ```bash
 $ docker-compose up
 ```
