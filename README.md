@@ -14,6 +14,12 @@ Lets start with one write and two read nodes.
 
 ```golang
 
+import (
+...
+	"github.com/randree/multibase/v2"
+...
+)
+
 func main() {
 
 	logger := logger.New(
