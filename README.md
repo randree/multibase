@@ -1,32 +1,30 @@
 # Postgres high-availability multiple databases connector for GROM
 
-Simple module to access multiple Postgres database clusters. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and not part of this module. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
+Simple module to access multiple (Postgres or other) database nodes. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and is not part of this module. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
 
-If an error occurs while process a read query the connector marks the node as offline and tries to ping until success. During offline time all queries are handled by the remaining read nodes. If all read nodes are offline the the load will be redirected to the master.
+A loss of a connection to any (including the master) of the nodes does not end up in a panic. Instead that node is marked as offline. If all read nodes are offline the the load will be redirected to the master. If the master is down no query can be processed but still if the nodes reconnect everything gets back to normal.
 
 The distribution to read nodes is done randomly. 
 
 Under the hood this package uses [GROM hooks](https://gorm.io/docs/hooks.html). Similar to [go-gorm/dbresolver](https://github.com/go-gorm/dbresolver).
 
-## 1. Configuration
+## Example
 
 Lets start with one write and two read nodes.
 
 ```golang
 
-// You can write your own logger or you can use the GORM logger
-func NewLogger() logger.Interface {
-	
-	config := logrusLogger.LoggerConfig{
-		SlowThreshold:         1000 * time.Millisecond, //show query if it takes to long to process
-		SkipErrRecordNotFound: false,
-		LogQuery:              false, // show all queries in logs
-	}
+func main() {
 
-	return logrusLogger.New(config)
-}
-
-func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
+	logger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second,   // Slow SQL threshold
+			LogLevel:                  logger.Silent, // Log level
+			IgnoreRecordNotFoundError: true,          // Ignore ErrRecordNotFound error for logger
+			Colorful:                  false,         // Disable color
+		},
+	)
 
 	// WRITE NODE
 	nodeWrite := &multibase.NodeConf{
@@ -36,12 +34,11 @@ func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
 		Password:          "database_password",
 		Sslmode:           "disable",
 		Db:                "testdb",
-		DbMaxOpenConns:    40,
+		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,
 		DbConnMaxLifetime: 1 * time.Hour,
-		DbLogger:          *logger, // If needed each node can get its own individual logger
+		DbLogger:          logger,
 	}
-
 	// READ NODE 1
 	nodeRead1 := &multibase.NodeConf{
 		Host:              "mycomputer",
@@ -50,10 +47,10 @@ func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
 		Password:          "database_password",
 		Sslmode:           "disable",
 		Db:                "testdb",
-		DbMaxOpenConns:    40,
+		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,
 		DbConnMaxLifetime: 1 * time.Hour,
-		DbLogger:          *logger,
+		DbLogger:          logger,
 	}
 
 	// READ NODE 2
@@ -64,102 +61,127 @@ func NewDatabaseConfig(logger *logger.Interface) multibase.DatabaseConf
 		Password:          "database_password",
 		Sslmode:           "disable",
 		Db:                "testdb",
-		DbMaxOpenConns:    40,
+		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,
 		DbConnMaxLifetime: 1 * time.Hour,
-		DbLogger:          *logger,
+		DbLogger:          logger,
 	}
 
-	replica := multibase.NewReplicationConf()
-	replica.AppendWriteNodeConf(nodeWrite)
-	replica.AppendReadNodeConf(nodeRead1)
-	replica.AppendReadNodeConf(nodeRead2)
+	// OpenNode uses gorm.Open with DisableAutomaticPing: true
+	// You can replace it by any other GORM opener
+	// The result should be a *gorm.DB instance
+	dbWrite, _ := multibase.OpenNode(nodeWrite) // Feel free to check err
+	dbRead1, _ := multibase.OpenNode(nodeRead1)
+	dbRead2, _ := multibase.OpenNode(nodeRead2)
 
-	databaseSetConf := multibase.NewDatabaseConf()
-	databaseSetConf.AppendReplicationConf("first_db", replica)
+	// Initiate multibase
+	// At this stage NO actual connection is made
+	mb := multibase.New(dbWrite, dbRead1, dbRead2)
 
-	return databaseSetConf
+	// The most important node is the write node.
+	// We use the following lines of code to ping the write node and connect to it.
+	// Even if no connection can be established, a panic does not occur.
+	for {
+		err := mb.ConnectWriteNode()
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			break
+		}
+		time.Sleep(time.Millisecond * 1000) // You can choose the interval
+	}
+
+	// After the write node is set up, it is time to connect the read nodes
+	err := mb.ConnectReadNodes()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// After this is done, GetDatabaseReplicaSet binds all nodes to a GORM database
+	// All read queries are forwarded to the read nodes.
+	db := mb.GetDatabaseReplicaSet()
+
+	// The StartReconnector is a go routine that checks the connection and 
+	// reconnects to the nodes if necessary.
+	mb.StartReconnector(time.Second * 1)
+
+	// Now we can use db as usual
+		type User struct {
+		ID   int `gorm:"primarykey"`
+		Name string
+	}
+	db.AutoMigrate(&User{})
+
+	user := &User{}
+	db.FirstOrInit(user, User{Name: "Jackx"})
+
+	...
+
+	// To get some statistics use GetStatistics
+	statistics := mb.GetStatistics()
+	fmt.Println(statistics)
+
+}
+
+```
+Statistics is a struct of following shape:
+```golang
+type Statistic struct {
+	online               bool
+	queryCount           int64
+	errorCount           int64
+	errorConnectionCount int64
 }
 ```
-Database access is called `first_db`. Appending databases is done by `AppendReplicationConf("...", replica)`
-
-## 2. Initialize databases
-You can choose the [GORM logger]() or a [logrus logger](https://github.com/onrik/gorm-logrus) or write your own one.
-
-```golang
-logger := NewLogger()
-
-dbConfig := NewDatabaseConfig(&logger)
-
-//Shows all 4 seconds a status of all databases
-debugmode := false
-
-// Call InitDb to initialize databases, e.q. in your main
-InitDb(databaseSetConf, debugmode)
+The output is similar to 
+```
+map[read0:{true 91214 3 0} read1:{true 98232 2 0} write:{true 234 0 0}]
 ```
 
-## 3. Get instance of database
 
-```golang
-db, err := Use("first_db")
-if err != nil {
-    ...
-}
-```
-`Use` returns a `*gorm.DB`. 
+# Try it out
 
-## 4. Using GROM as usual
+Use the `docker-compose.yml` to test the example.
 
-Now we can use `db` as database in GORM.
-
-```
-db.First(&user) //read1 or read2
-db.Where("name <> ?", "foo").Find(&users) //read1 or read2
-
-db.Create(&users) //write
-
-```
-
-# Status of nodes
-The status of a node can be verified by 
-```golang
-node := UseNode("mydatabase", "host", 9000)
-```
-
-| Field         |type    |                     |
-| ------------- |--------|---------------------|
-| Errors        | `int`  | `node.errorsCount`  |
-| Queries       | `int64`| `node.queryCount`   |
-| Online        | `bool` | `node.online`       |
-
-Turning off a read node on the fly can be done with `node.online = false`. Then it can be safely turned down, replaced and restarted again. When it's ready with `node.online = true` it can be activated.
-
-# Benchmark
-
-After shutting down one read node after another under heavy concurrent load the rerouting was (almost) seamless. When turning them on again the system went back to a equal distribution between read nodes without any interruptions.
-
-A quantitative analysis would be interesting.
-
-# Testing
-
-
-For testing this module go to directory root and execute
+1. Open two consoles.  
+2. In the first one spin up nodes with
 ```bash
-$ docker-compose up
+$ docker-compose up -d
 ```
-and
+3. Write a `main.go` like one the above, add
+```golang
+	for {
+		fmt.Print("\033[H\033[2J") // to clear the console after each cycle
+		user := []User{}
+		db.Find(&user)
+
+		// Print out statistics
+		fmt.Println(mb.GetStatistics())
+		// map[read0:{true 1125 0 0} read1:{true 1087 0 0} write:{true 0 0 0}]
+
+		time.Sleep(time.Millisecond * 100) // refresh each 100 ms
+	}
+``` 
+4. In the second console run go
 ```bash
-$ go test -count=1 -v ./...
+$ go run main.go
 ```
+the result should be a similar to 
+```
+map[read0:{true 91214 3 0} read1:{true 98232 2 0} write:{true 234 0 0}]
+```
+5. While the go program is running stop a read node with
+```bash
+$ docker stop read2
+```
+and see that all queries are forwarded to `read0` (count starts at here at 0) and `read1` (read2) is marked as offline.
 
+6. Turn read2 on.
+```bash
+$ docker start read2
+```
+and the count is distributed between both read nodes.
 
-# ToDos
+7. Play around. Stop the write node. Stop all nodes. Then start all with `docker start write read1 read2`.
 
-* Adding multiple write nodes. At this time only one write node does the work.
-* If a connection on a read node is interrupted there is a loss of about one query depending on the concurrency. This can be fixed by catching these queries.
-* Adding new nodes on the fly.
-* Optimizing the administration.
-* More testing.
-
-
-
+The program should never stop or panic.

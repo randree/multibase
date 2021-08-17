@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// NodeConf: Node config
 type NodeConf struct {
 	Host              string
 	Port              int

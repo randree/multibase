@@ -3,6 +3,7 @@ services:
   first_write:
     image: 'bitnami/postgresql:latest'
     # user: 1001:1001 bitnami/postgresql is always non-root
+    container_name: write
     ports:
       - 9000:5432
     environment:
@@ -24,6 +25,7 @@ services:
 
   first_read_1:
     image: 'bitnami/postgresql:latest'
+    container_name: read1
     ports:
       - 9001:5432
     depends_on:
@@ -42,6 +44,7 @@ services:
 
   first_read_2:
     image: 'bitnami/postgresql:latest'
+    container_name: read2
     ports:
       - 9002:5432
     depends_on:
@@ -56,18 +59,6 @@ services:
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
     networks:
       - net
-
-  # second_write is a normal database without replication
-  second_write:
-    image: postgres:13.1-alpine
-    ports:
-      - 9003:5432
-    networks:
-      - net
-    environment:
-      - POSTGRES_DB=second_write
-      - POSTGRES_USER=user_second_write
-      - POSTGRES_PASSWORD=second_writepw
 
 networks:
   net:
