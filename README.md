@@ -1,4 +1,4 @@
-# Multinode databases connector for GROM
+# Multinode database connector for GROM
 
 Simple module to access multiple (Postgres or other) database nodes. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and is not part of this module. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
 
