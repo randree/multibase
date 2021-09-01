@@ -58,7 +58,7 @@ func (m *multibase) ConnectWriteNode() error {
 	}
 	// Check connection and connect write node with ping
 	if err := CheckConnection(m.writeNode.DB); err != nil {
-		return fmt.Errorf("can't connect to write DB")
+		return fmt.Errorf("can't connect to write DB with error: %w", err)
 	} else {
 		m.writeNode.online = true
 	}
