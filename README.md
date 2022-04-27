@@ -1,5 +1,13 @@
 # Multinode database connector for GROM
 
+[![MIT licensed][1]][2] [![Go Report Card][3]][4]
+
+
+[1]: https://img.shields.io/badge/license-MIT-blue.svg
+[2]: LICENSE
+[3]: https://goreportcard.com/badge/github.com/randree/multibase/v2
+[4]: https://goreportcard.com/report/github.com/randree/multibase/v2
+
 Simple module to access multiple (Postgres or other) database nodes. Databases are divided into ONE write (or master) and MANY read (or slave) nodes. Replication is handled by the database and is not part of this module. You can choose for example [bitnami/bitnami-docker-postgresql](https://github.com/bitnami/bitnami-docker-postgresql) docker containers. They take care of replication.
 
 A loss of a connection to any (including the master) of the nodes does not end up in a panic. Instead that node is marked as offline. If all read nodes are offline the the load will be redirected to the master. If the master is down no query can be processed but still if the nodes reconnect everything gets back to normal.
@@ -145,7 +153,7 @@ map[read0:{true 91214 3 0} read1:{true 98232 2 0} write:{true 234 0 0}]
 ```
 
 
-# Try it out
+## Try it out
 
 Use the `docker-compose.yml` to test the example.
 
@@ -191,3 +199,7 @@ and the count is distributed between both read nodes.
 7. Play around. Stop the write node. Stop all nodes. Then start all with `docker start write read1 read2`.
 
 The program should never stop or panic.
+
+## Replication
+
+Note that replication takes time in some cases. Try to avoid writing and reading the same data set in one routine.
