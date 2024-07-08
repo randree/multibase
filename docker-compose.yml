@@ -5,7 +5,7 @@ services:
     # user: 1001:1001 bitnami/postgresql is always non-root
     container_name: write
     ports:
-      - 9000:5432
+      - 127.0.0.1:9000:5432
     environment:
       - POSTGRESQL_REPLICATION_MODE=master
       - POSTGRESQL_REPLICATION_USER=replication_user
@@ -27,14 +27,14 @@ services:
     image: 'bitnami/postgresql:latest'
     container_name: read1
     ports:
-      - 9001:5432
+      - 127.0.0.1:9001:5432
     depends_on:
       - first_write
     environment:
       - POSTGRESQL_REPLICATION_MODE=slave
       - POSTGRESQL_REPLICATION_USER=replication_user
       - POSTGRESQL_REPLICATION_PASSWORD=replication_password
-      - POSTGRESQL_MASTER_HOST=mycomputer
+      - POSTGRESQL_MASTER_HOST=localhost
       - POSTGRESQL_PASSWORD=database_password
       - POSTGRESQL_MASTER_PORT_NUMBER=9000
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
@@ -46,14 +46,14 @@ services:
     image: 'bitnami/postgresql:latest'
     container_name: read2
     ports:
-      - 9002:5432
+      - 127.0.0.1:9002:5432
     depends_on:
       - first_write
     environment:
       - POSTGRESQL_REPLICATION_MODE=slave
       - POSTGRESQL_REPLICATION_USER=replication_user
       - POSTGRESQL_REPLICATION_PASSWORD=replication_password
-      - POSTGRESQL_MASTER_HOST=mycomputer
+      - POSTGRESQL_MASTER_HOST=localhost
       - POSTGRESQL_PASSWORD=database_password
       - POSTGRESQL_MASTER_PORT_NUMBER=9000
       - POSTGRESQL_PGAUDIT_LOG=READ,WRITE

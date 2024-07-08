@@ -27,7 +27,7 @@ func main() {
 
 	// WRITE NODE
 	nodeWrite := &multibase.NodeConf{
-		Host:              "mycomputer",
+		Host:              "localhost",
 		Port:              9000,
 		User:              "database_user",
 		Password:          "database_password",
@@ -41,7 +41,7 @@ func main() {
 	}
 	// READ NODE 1
 	nodeRead1 := &multibase.NodeConf{
-		Host:              "mycomputer",
+		Host:              "localhost",
 		Port:              9001,
 		User:              "database_user", // User must be the master.
 		Password:          "database_password",
@@ -56,7 +56,7 @@ func main() {
 
 	// READ NODE 2
 	nodeRead2 := &multibase.NodeConf{
-		Host:              "mycomputer",
+		Host:              "localhost",
 		Port:              9002,
 		User:              "database_user",
 		Password:          "database_password",
