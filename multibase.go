@@ -243,13 +243,15 @@ func CheckConnection(db *gorm.DB) error {
 func OpenNode(nodeConf *NodeConf) (*gorm.DB, error) {
 
 	psqlDSN := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=%s",
+		"password=%s dbname=%s sslmode=%s TimeZone=%s",
 		nodeConf.Host,
 		nodeConf.Port,
 		nodeConf.User,
 		nodeConf.Password,
 		nodeConf.Db,
-		nodeConf.Sslmode)
+		nodeConf.Sslmode,
+		nodeConf.TimeZone,
+	)
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: psqlDSN, // data Database name, refer https://github.com/jackc/pgx

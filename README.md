@@ -47,6 +47,7 @@ func main() {
 		User:              "database_user",
 		Password:          "database_password",
 		Sslmode:           "disable",
+		TimeZone:		   "Asia/Shanghai",
 		Db:                "testdb",
 		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,
@@ -60,6 +61,7 @@ func main() {
 		User:              "database_user", // User must be the master.
 		Password:          "database_password",
 		Sslmode:           "disable",
+		TimeZone:		   "Asia/Shanghai",
 		Db:                "testdb",
 		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,
@@ -74,6 +76,7 @@ func main() {
 		User:              "database_user",
 		Password:          "database_password",
 		Sslmode:           "disable",
+		TimeZone:		   "Asia/Shanghai",
 		Db:                "testdb",
 		DbMaxOpenConns:    20,
 		DbMaxIdleConns:    8,

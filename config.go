@@ -14,6 +14,7 @@ type NodeConf struct {
 	Password          string
 	Db                string
 	Sslmode           string
+	TimeZone          string // e.g. Asia/Shanghai
 	DbMaxOpenConns    int
 	DbMaxIdleConns    int
 	DbConnMaxLifetime time.Duration
